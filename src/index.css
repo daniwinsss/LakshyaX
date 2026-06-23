@@ -1,0 +1,23 @@
+@import "tailwindcss";
+
+@theme {
+  --color-primary: #facc15;
+  --color-primary-hover: #eab308;
+  --color-secondary: #fff9db;
+  --color-background: #ffffff;
+  --color-foreground: #111827;
+  --color-accent: #eab308;
+
+  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
+}
+
+@layer utilities {
+  .glass-card {
+    @apply bg-white/70 backdrop-blur-md border border-white/20 shadow-[0_8px_30px_rgb(0,0,0,0.04)] rounded-2xl;
+  }
+}
+
+body {
+  @apply bg-background text-foreground antialiased selection:bg-primary/30;
+}
