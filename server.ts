@@ -67,6 +67,20 @@ async function startServer() {
     res.json(db.quests);
   });
 
+  app.post("/api/quests", (req, res) => {
+    const quest = req.body;
+    if (!quest.id) {
+      quest.id = String(db.quests.length + 1);
+    }
+    const existingIndex = db.quests.findIndex(q => q.id === quest.id);
+    if (existingIndex > -1) {
+      db.quests[existingIndex] = quest;
+    } else {
+      db.quests.push(quest);
+    }
+    res.json({ success: true, quest });
+  });
+
   app.post("/api/quests/:questId/tasks/:taskId", (req, res) => {
     const { questId, taskId } = req.params;
     const { completed } = req.body;

@@ -1,23 +1,105 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700;800;900&family=JetBrains+Mono:wght@400;500;700&display=swap');
 @import "tailwindcss";
 
 @theme {
   --color-primary: #facc15;
   --color-primary-hover: #eab308;
-  --color-secondary: #fff9db;
-  --color-background: #ffffff;
-  --color-foreground: #111827;
-  --color-accent: #eab308;
+  --color-secondary: #fffbf0;
+  --color-background: #faf8f5;
+  --color-foreground: #1c1917;
+  --color-accent: #d97706;
 
   --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-display: "Space Grotesk", ui-sans-serif, system-ui, sans-serif;
   --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
+
+  --animate-shimmer: shimmer 2.5s infinite linear;
+  --animate-pulse-subtle: pulse-subtle 4s infinite ease-in-out;
+  --animate-gold-glow: gold-glow 3s infinite alternate ease-in-out;
+
+  @keyframes shimmer {
+    0% { background-position: -200% 0; }
+    100% { background-position: 200% 0; }
+  }
+  @keyframes pulse-subtle {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.8; }
+  }
+  @keyframes gold-glow {
+    0% { box-shadow: 0 0 15px rgba(234, 179, 8, 0.1), inset 0 0 5px rgba(234, 179, 8, 0.05); }
+    100% { box-shadow: 0 0 35px rgba(234, 179, 8, 0.35), inset 0 0 15px rgba(234, 179, 8, 0.15); }
+  }
 }
 
 @layer utilities {
   .glass-card {
-    @apply bg-white/70 backdrop-blur-md border border-white/20 shadow-[0_8px_30px_rgb(0,0,0,0.04)] rounded-2xl;
+    background: rgba(22, 19, 14, 0.85);
+    backdrop-filter: blur(20px) saturate(160%);
+    -webkit-backdrop-filter: blur(20px) saturate(160%);
+    border: 1px solid rgba(234, 179, 8, 0.15);
+    box-shadow: 
+      inset 0 1px 0 rgba(255, 255, 255, 0.03),
+      0 12px 40px -10px rgba(0, 0, 0, 0.6);
+    border-radius: 20px;
+  }
+  
+  .shimmer-bg {
+    background: linear-gradient(90deg, #eab308 0%, #fef08a 25%, #facc15 50%, #fef08a 75%, #eab308 100%);
+    background-size: 200% 100%;
+    animation: shimmer 2.5s infinite linear;
+  }
+
+  .gold-shimmer-text {
+    background: linear-gradient(135deg, #fdfcf9 20%, #facc15 45%, #fef08a 50%, #facc15 55%, #fdfcf9 80%);
+    background-size: 200% auto;
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    animation: shimmer 4s infinite linear;
+  }
+
+  /* Ultra Premium Holo/Foil Shimmer effect */
+  .perspective-1000 {
+    perspective: 1000px;
+    -webkit-perspective: 1000px;
+  }
+
+  .foil-shine {
+    position: relative;
+    overflow: hidden;
+  }
+  
+  .foil-shine::after {
+    content: "";
+    position: absolute;
+    top: -150%;
+    left: -150%;
+    width: 400%;
+    height: 400%;
+    background: linear-gradient(
+      135deg,
+      transparent 35%,
+      rgba(254, 240, 138, 0.07) 48%,
+      rgba(250, 204, 21, 0.15) 50%,
+      rgba(254, 240, 138, 0.07) 52%,
+      transparent 65%
+    );
+    transform: rotate(-10deg);
+    transition: transform 0.6s ease;
+    pointer-events: none;
+  }
+  
+  .foil-shine:hover::after {
+    transform: translate(50%, 50%) rotate(-10deg);
+    transition: transform 1.2s cubic-bezier(0.16, 1, 0.3, 1);
   }
 }
 
 body {
-  @apply bg-background text-foreground antialiased selection:bg-primary/30;
+  @apply bg-background text-foreground antialiased selection:bg-primary/40;
+  cursor: none !important;
+}
+
+/* Ensure buttons and interactive elements also use no cursor so custom cursor shows */
+*, a, button {
+  cursor: none !important;
 }
