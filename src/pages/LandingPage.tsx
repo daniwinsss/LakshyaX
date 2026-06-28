@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { motion, useScroll, useTransform } from "framer-motion";
+import { motion, useScroll, useTransform, useMotionValue, useSpring } from "framer-motion";
 import { useNavigate } from "react-router-dom";
 import {
   Sword,
@@ -23,6 +23,7 @@ import {
   Moon
 } from "lucide-react";
 import FeatureFlashcard from "../components/FeatureFlashcard";
+import { Interactive3DCard } from "../components/Interactive3DCard";
 import { HeroInteractiveCard } from "../components/HeroInteractiveCard";
 import { playClickSfx } from "../utils/audio";
 
@@ -348,8 +349,13 @@ export default function LandingPage() {
             ].map((link) => (
               <a
                 key={link.id}
-                href={`#${link.id}`}
+                href={link.id === 'demo' ? '/dashboard?tour=true' : `#${link.id}`}
                 onClick={(e) => {
+                  if (link.id === 'demo') {
+                    e.preventDefault();
+                    navigate('/dashboard?tour=true');
+                    return;
+                  }
                   e.preventDefault();
                   document.getElementById(link.id)?.scrollIntoView({ behavior: "smooth" });
                 }}
@@ -625,16 +631,16 @@ export default function LandingPage() {
           time.
         </p>
 
-        <div className="bg-[#171510]/90 border border-yellow-500/15 p-6 sm:p-8 rounded-[2.5rem] text-left relative overflow-hidden shadow-2xl">
+        <Interactive3DCard className="bg-[#171510]/90 border border-yellow-500/15 p-6 sm:p-8 rounded-[2.5rem] text-left relative overflow-hidden shadow-2xl group hover:shadow-[0_0_50px_rgba(234,179,8,0.15)] transition-[box-shadow] duration-500 foil-shine cursor-pointer">
           <div className="flex items-center gap-3 border-b border-yellow-500/10 pb-4 mb-4">
-            <div className="w-10 h-10 rounded-full bg-yellow-600 flex items-center justify-center text-black shadow-lg border border-yellow-400/30">
+            <div className="w-10 h-10 rounded-full bg-yellow-600 flex items-center justify-center text-black shadow-[0_0_15px_rgba(234,179,8,0.4)] border border-yellow-400/30 group-hover:scale-110 transition-transform duration-500">
               <Star
                 className="animate-spin text-amber-900"
                 size={20}
                 style={{ animationDuration: "8s" }}
               />
             </div>
-            <div>
+            <div style={{ transform: "translateZ(10px)" }}>
               <div className="font-extrabold text-sm text-[#fdfcf9]">
                 Game Master AI
               </div>
@@ -643,7 +649,7 @@ export default function LandingPage() {
               </div>
             </div>
           </div>
-          <div className="space-y-4 font-mono text-xs sm:text-sm leading-relaxed text-[#b8b3a0]">
+          <div className="space-y-4 font-mono text-xs sm:text-sm leading-relaxed text-[#b8b3a0]" style={{ transform: "translateZ(15px)" }}>
             <div className="text-red-400 font-extrabold flex items-center gap-2">
               <span>&gt; ALERT:</span> Assignment Dragon HP remains at 42%. Time
               limit: 18 hours.
@@ -654,15 +660,15 @@ export default function LandingPage() {
               side objective.
             </div>
             <div className="text-[#fdfcf9] font-medium italic pl-4 border-l border-yellow-500/25">
-              "Gather your focus blocks, Paladin. A 45-minute study study
-              session will award critical modifiers and defeat the beast."
+              "Gather your focus blocks, Paladin. A 45-minute study session
+              will award critical modifiers and defeat the beast."
             </div>
             <div className="text-yellow-500 font-bold">
               <span>&gt; OPTION RECOGNITION:</span> Initiate Focus Dungeon now?
               [Yes / No]
             </div>
           </div>
-        </div>
+        </Interactive3DCard>
       </motion.section>
 
       {/* Section 5: Real-world stats metrics */}

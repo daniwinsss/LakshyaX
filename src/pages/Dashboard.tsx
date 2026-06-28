@@ -1,14 +1,73 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { Sword, Target, Flame, Coins, BrainCircuit, Play, CheckCircle2, Circle, AlertTriangle, MessageSquare, Volume2, ArrowLeft, Shield, Users, UserPlus } from 'lucide-react';
+import { Joyride, Step, TooltipRenderProps } from 'react-joyride';
 import { UserData, Quest } from '../types';
 import TaskCard from '../components/TaskCard';
 import { D3ForceGraph } from '../components/D3ForceGraph';
 import { playClickSfx, playSuccessSfx, playQuestSpawnSfx } from '../utils/audio';
 
+const CustomTooltip = ({
+  index,
+  step,
+  tooltipProps,
+  primaryProps,
+  backProps,
+  skipProps,
+  isLastStep,
+}: TooltipRenderProps) => (
+  <div
+    {...tooltipProps}
+    className="bg-[#12100d] border border-yellow-500/30 p-6 rounded-3xl shadow-[0_0_40px_rgba(234,179,8,0.25)] max-w-sm text-left relative overflow-hidden"
+  >
+    {/* Background Grid Pattern */}
+    <div className="absolute inset-0 bg-[linear-gradient(rgba(255,255,255,0.02)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.02)_1px,transparent_1px)] bg-[size:20px_20px] [mask-image:radial-gradient(ellipse_60%_50%_at_50%_50%,#000_70%,transparent_100%)] pointer-events-none -z-10" />
+    
+    {step.title && (
+      <div className="flex items-center gap-2 mb-3">
+        <div className="w-8 h-8 rounded-full bg-yellow-500/10 flex items-center justify-center border border-yellow-500/30 text-yellow-500">
+          <BrainCircuit size={16} />
+        </div>
+        <h3 className="font-display font-black text-xl text-yellow-400 tracking-tight">
+          {step.title}
+        </h3>
+      </div>
+    )}
+    <div className="text-[#b8b3a0] text-sm leading-relaxed mb-6 font-medium">
+      {step.content}
+    </div>
+    <div className="flex items-center justify-between">
+      <button
+        {...skipProps}
+        className="text-xs font-bold text-[#b8b3a0] hover:text-[#fdfcf9] transition-colors"
+      >
+        Skip Tutorial
+      </button>
+      <div className="flex gap-2">
+        {index > 0 && (
+          <button
+            {...backProps}
+            className="px-4 py-2 rounded-xl text-xs font-bold text-[#b8b3a0] bg-white/5 border border-white/10 hover:bg-white/10 hover:text-white transition-colors"
+          >
+            Back
+          </button>
+        )}
+        <button
+          {...primaryProps}
+          className="px-5 py-2 rounded-xl text-xs font-bold text-black bg-yellow-500 hover:bg-yellow-400 transition-colors shadow-lg shadow-yellow-950/50 flex items-center gap-2"
+        >
+          {isLastStep ? 'Start Playing' : 'Next'}
+          {!isLastStep && <Play size={12} className="text-amber-900" />}
+        </button>
+      </div>
+    </div>
+  </div>
+);
+
 export default function Dashboard() {
   const navigate = useNavigate();
+  const location = useLocation();
   const [user, setUser] = useState<UserData | null>(null);
   const [quests, setQuests] = useState<Quest[]>([]);
   const [isGeneratingQuest, setIsGeneratingQuest] = useState(false);
@@ -21,12 +80,65 @@ export default function Dashboard() {
   const [activeView, setActiveView] = useState<'quests' | 'roadmap'>('quests');
   const [showLevelUp, setShowLevelUp] = useState(false);
   const [party, setParty] = useState<{id: string, name: string, level: number, xp: number, isCurrentUser: boolean}[]>([]);
+  
+  const [runTour, setRunTour] = useState(false);
+  const tourSteps: Step[] = [
+    {
+      target: '.tour-add-quest',
+      title: 'Summon Quests',
+      content: 'Start by summoning your quests here. Enter any massive task, and the AI will auto-break it into boss fights and side-quests!',
+      disableBeacon: true,
+      placement: 'bottom',
+      spotlightPadding: 10,
+    },
+    {
+      target: '.tour-game-master',
+      title: 'Game Master AI',
+      content: 'This is your Game Master AI. It monitors your progress and contextually adapts the narrative to keep you motivated.',
+      placement: 'left',
+      spotlightPadding: 0,
+    },
+    {
+      target: '.tour-focus-dungeon',
+      title: 'Focus Dungeon',
+      content: 'Enter the Focus Dungeon to start a timed work session. Defeating monsters here earns you huge XP multipliers!',
+      placement: 'top',
+      spotlightPadding: 10,
+    },
+    {
+      target: '.tour-streak',
+      title: 'Streaks & Rewards',
+      content: 'Maintain your daily focus streak to multiply your XP gains. Keep the flame alive!',
+      placement: 'top',
+      spotlightPadding: 10,
+    },
+    {
+      target: '.tour-rivals',
+      title: 'Rivals Leaderboard',
+      content: 'Compete against other players. Steal their ranks by completing more quests and surviving longer in the dungeon.',
+      placement: 'left',
+      spotlightPadding: 10,
+    },
+    {
+      target: '.tour-rescue-mode',
+      title: 'Rescue Mode',
+      content: 'If you\'re failing, trigger Rescue Mode! The Game Master will automatically drop non-essential tasks and build an emergency sprint.',
+      placement: 'top',
+      spotlightPadding: 10,
+    }
+  ];
 
   useEffect(() => {
     fetch('/api/user').then(res => res.json()).then(setUser);
     fetch('/api/quests').then(res => res.json()).then(setQuests);
     fetch('/api/leaderboard').then(res => res.json()).then(data => setParty(data.party));
-  }, []);
+    
+    // Check if we should start the tour
+    const searchParams = new URLSearchParams(location.search);
+    if (searchParams.get('tour') === 'true') {
+      setRunTour(true);
+    }
+  }, [location.search]);
 
   const handleTaskToggle = async (questId: string, taskId: string, currentStatus: boolean) => {
     // Play satisfying success chime if marking complete
@@ -152,7 +264,33 @@ export default function Dashboard() {
 
   return (
     <div className="min-h-screen bg-[#0c0a07] text-[#fdfcf9] flex flex-col md:flex-row overflow-hidden h-screen font-sans relative">
-      
+      <Joyride
+        steps={tourSteps}
+        run={runTour}
+        continuous
+        showProgress
+        showSkipButton
+        disableOverlayClose
+        spotlightClicks={true}
+        tooltipComponent={CustomTooltip}
+        styles={{
+          options: {
+            arrowColor: '#12100d',
+          }
+        }}
+        callback={(data) => {
+          const { status } = data;
+          if (status === 'finished' || status === 'skipped') {
+            setRunTour(false);
+            // Remove tour query param
+            const searchParams = new URLSearchParams(location.search);
+            if (searchParams.has('tour')) {
+              searchParams.delete('tour');
+              navigate({ search: searchParams.toString() }, { replace: true });
+            }
+          }
+        }}
+      />
       {/* Level Up Animation Overlay */}
       <AnimatePresence>
         {showLevelUp && (
@@ -251,7 +389,7 @@ export default function Dashboard() {
         </div>
 
         <div className="grid grid-cols-2 gap-3">
-          <div className="glass-card p-4 flex flex-col items-center justify-center gap-2 bg-[#211d15]/95 border border-yellow-500/15 rounded-2xl">
+          <div className="glass-card p-4 flex flex-col items-center justify-center gap-2 bg-[#211d15]/95 border border-yellow-500/15 rounded-2xl tour-streak">
             <div className="flex items-center gap-2">
               <Flame className="text-yellow-500" size={20} />
               <div className="text-xl font-black font-display text-[#fdfcf9]">{user.streak}</div>
@@ -270,7 +408,7 @@ export default function Dashboard() {
           </div>
         </div>
 
-        <div className="glass-card p-4 border border-yellow-500/15 bg-[#211d15]/95 rounded-2xl flex flex-col gap-3">
+        <div className="glass-card p-4 border border-yellow-500/15 bg-[#211d15]/95 rounded-2xl flex flex-col gap-3 tour-rivals">
           <div className="flex items-center justify-between mb-1">
             <div className="flex items-center gap-2">
               <Users className="text-yellow-500" size={16} />
@@ -314,7 +452,7 @@ export default function Dashboard() {
           </div>
         </div>
 
-        <div className="glass-card p-5 mt-auto border border-yellow-500/15 bg-[#211d15]/95 rounded-2xl">
+        <div className="glass-card p-5 mt-auto border border-yellow-500/15 bg-[#211d15]/95 rounded-2xl tour-focus-dungeon">
           <div className="flex items-center gap-2 mb-3">
             <Target className="text-yellow-500" size={16} />
             <h3 className="font-bold text-sm text-[#fdfcf9]">Focus Dungeon</h3>
@@ -331,7 +469,7 @@ export default function Dashboard() {
           </button>
         </div>
 
-        <div className="glass-card p-5 border border-red-500/20 bg-red-950/20 rounded-2xl">
+        <div className="glass-card p-5 border border-red-500/20 bg-red-950/20 rounded-2xl tour-rescue-mode">
           <div className="flex items-center gap-2 mb-3">
             <AlertTriangle className="text-red-500" size={16} />
             <h3 className="font-bold text-sm text-red-400">Rescue Mode</h3>
@@ -421,7 +559,9 @@ export default function Dashboard() {
         {activeView === 'quests' ? (
           <>
             {/* Dynamic Quest Generator Form */}
-            <TaskCard onSubmit={handleCreateQuest} isGenerating={isGeneratingQuest} />
+            <div className="tour-add-quest">
+              <TaskCard onSubmit={handleCreateQuest} isGenerating={isGeneratingQuest} />
+            </div>
 
             {/* Analytics row */}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
@@ -516,7 +656,7 @@ export default function Dashboard() {
       </main>
 
       {/* AI Game Master Panel */}
-      <aside className="w-full md:w-96 border-l border-yellow-500/10 bg-[#100e0a]/95 flex flex-col h-full shrink-0 relative z-10">
+      <aside className="w-full md:w-96 border-l border-yellow-500/10 bg-[#100e0a]/95 flex flex-col h-full shrink-0 relative z-10 tour-game-master">
         <div className="p-4 border-b border-yellow-500/10 bg-[#16130e]/80 flex items-center gap-3">
           <div className="relative">
             <div className="w-10 h-10 rounded-xl bg-yellow-500/10 flex items-center justify-center border border-yellow-500/20">
