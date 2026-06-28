@@ -40,7 +40,7 @@ export function CustomCursor() {
         y: smoothY,
         opacity: isVisible ? 1 : 0,
       }}
-      className="fixed top-0 left-0 pointer-events-none z-[9999] text-yellow-500 drop-shadow-[0_0_8px_rgba(234,179,8,0.8)] mix-blend-difference"
+      className="fixed top-0 left-0 pointer-events-none z-[9999] text-yellow-500 drop-shadow-md"
     >
       <Target size={24} strokeWidth={2.5} />
     </motion.div>

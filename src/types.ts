@@ -4,6 +4,7 @@ export interface UserData {
   xpToNextLevel: number;
   coins: number;
   streak: number;
+  lastDungeonDate?: string;
   productivityScore: number;
 }
 
@@ -23,4 +24,6 @@ export interface Quest {
   tasks: Task[];
   rewards: { xp: number; coins: number };
   riskScore: 'low' | 'medium' | 'high';
+  dependencies?: string[];
+  estimatedHours?: number;
 }

@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
-import { Sword, Target, Flame, Coins, BrainCircuit, Play, CheckCircle2, Circle, AlertTriangle, MessageSquare, Volume2, ArrowLeft } from 'lucide-react';
+import { Sword, Target, Flame, Coins, BrainCircuit, Play, CheckCircle2, Circle, AlertTriangle, MessageSquare, Volume2, ArrowLeft, Shield, Users, UserPlus } from 'lucide-react';
 import { UserData, Quest } from '../types';
 import TaskCard from '../components/TaskCard';
+import { D3ForceGraph } from '../components/D3ForceGraph';
 import { playClickSfx, playSuccessSfx, playQuestSpawnSfx } from '../utils/audio';
 
 export default function Dashboard() {
@@ -17,10 +18,14 @@ export default function Dashboard() {
   ]);
   const [isTyping, setIsTyping] = useState(false);
   const [isVoiceActive, setIsVoiceActive] = useState(false);
+  const [activeView, setActiveView] = useState<'quests' | 'roadmap'>('quests');
+  const [showLevelUp, setShowLevelUp] = useState(false);
+  const [party, setParty] = useState<{id: string, name: string, level: number, xp: number, isCurrentUser: boolean}[]>([]);
 
   useEffect(() => {
     fetch('/api/user').then(res => res.json()).then(setUser);
     fetch('/api/quests').then(res => res.json()).then(setQuests);
+    fetch('/api/leaderboard').then(res => res.json()).then(data => setParty(data.party));
   }, []);
 
   const handleTaskToggle = async (questId: string, taskId: string, currentStatus: boolean) => {
@@ -40,56 +45,60 @@ export default function Dashboard() {
     if (data.success && data.quest) {
       setUser(data.user);
       setQuests(prev => prev.map(q => q && q.id === questId ? data.quest : q).filter(Boolean));
+      fetch('/api/leaderboard').then(res => res.json()).then(data => setParty(data.party));
       
-      // GM comment on task completion
-      if (!currentStatus) {
+      if (data.leveledUp) {
+        setShowLevelUp(true);
+        setTimeout(() => setShowLevelUp(false), 5000);
+        setChatHistory(prev => [...prev, { role: 'gm', text: `🌟 LEVEL UP! You have ascended to Level ${data.user.level}!`}]);
+      } else if (!currentStatus) {
         setChatHistory(prev => [...prev, { role: 'gm', text: `⚔️ Critical hit! You dealt damage to ${data.quest.title}. XP and Gold awarded.`}]);
       }
     }
   };
 
-  const handleCreateQuest = (title: string, difficulty: 'low' | 'medium' | 'high') => {
+  const handleCreateQuest = async (title: string, deadline?: string) => {
     playQuestSpawnSfx();
     setIsGeneratingQuest(true);
-    setChatHistory(prev => [...prev, { role: 'gm', text: `✨ Generating customized multi-phase Quest chain for: "${title}" [Difficulty: ${difficulty.toUpperCase()}]...`}]);
+    setChatHistory(prev => [...prev, { role: 'gm', text: `✨ Analyzing "${title}" to generate customized multi-phase Quest chain...`}]);
     
-    // Simulate Gemini generation
-    setTimeout(async () => {
+    try {
+      const genResponse = await fetch('/api/generate-quest', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ title, deadline })
+      });
+      const generated = await genResponse.json();
+      const difficulty = generated.difficulty || 'medium';
+      
       const newQuest: Quest = {
         id: String(Date.now()),
         title: title,
         type: difficulty === 'high' ? 'boss' : 'quest',
-        deadline: new Date(Date.now() + 48 * 60 * 60 * 1000).toISOString(),
+        deadline: deadline || new Date(Date.now() + 48 * 60 * 60 * 1000).toISOString(),
         health: 100,
         maxHealth: 100,
-        tasks: [
-          { id: `t_${Date.now()}_1`, title: "Phase 1: Conceptual Foundations", completed: false },
-          { id: `t_${Date.now()}_2`, title: "Phase 2: Practice Sprints", completed: false },
-          { id: `t_${Date.now()}_3`, title: "Phase 3: Ultimate Review", completed: false }
-        ],
+        tasks: generated.tasks || [],
         rewards: { xp: difficulty === 'high' ? 800 : 450, coins: difficulty === 'high' ? 200 : 90 },
         riskScore: difficulty
       };
       
-      try {
-        const response = await fetch('/api/quests', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(newQuest)
-        });
-        const result = await response.json();
-        if (result.success) {
-          setQuests(prev => [result.quest, ...prev.filter(Boolean)]);
-          setChatHistory(prev => [...prev, { role: 'gm', text: `⚔️ Quest Chain registered! "${title}" has been spawned with 3 phases.`}]);
-        }
-      } catch (err) {
-        console.error("Failed to sync quest to server:", err);
-        setQuests(prev => [newQuest, ...prev.filter(Boolean)]);
-        setChatHistory(prev => [...prev, { role: 'gm', text: `⚔️ Quest Chain registered (Local Mode)! "${title}" has been spawned with 3 phases.`}]);
-      } finally {
-        setIsGeneratingQuest(false);
+      const response = await fetch('/api/quests', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(newQuest)
+      });
+      const result = await response.json();
+      if (result.success) {
+        setQuests(prev => [result.quest, ...prev.filter(Boolean)]);
+        setChatHistory(prev => [...prev, { role: 'gm', text: `⚔️ Quest Chain registered! "${title}" has been spawned with ${newQuest.tasks.length} phases at ${difficulty.toUpperCase()} difficulty.`}]);
       }
-    }, 1500);
+    } catch (err) {
+      console.error("Failed to sync quest to server:", err);
+      setChatHistory(prev => [...prev, { role: 'gm', text: `⚔️ Failed to generate quest for "${title}".`}]);
+    } finally {
+      setIsGeneratingQuest(false);
+    }
   };
 
   const handleChatSubmit = async (e: React.FormEvent) => {
@@ -144,6 +153,41 @@ export default function Dashboard() {
   return (
     <div className="min-h-screen bg-[#0c0a07] text-[#fdfcf9] flex flex-col md:flex-row overflow-hidden h-screen font-sans relative">
       
+      {/* Level Up Animation Overlay */}
+      <AnimatePresence>
+        {showLevelUp && (
+          <motion.div 
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-md"
+          >
+            <motion.div 
+              initial={{ scale: 0.5, y: 50, opacity: 0 }}
+              animate={{ scale: 1, y: 0, opacity: 1 }}
+              exit={{ scale: 0.8, opacity: 0 }}
+              transition={{ type: "spring", bounce: 0.5 }}
+              className="relative flex flex-col items-center justify-center p-16 bg-gradient-to-b from-[#211d15] to-[#0c0a07] border border-yellow-500/30 rounded-3xl shadow-[0_0_150px_rgba(234,179,8,0.15)]"
+            >
+              <motion.div
+                animate={{ rotate: 360 }}
+                transition={{ duration: 10, repeat: Infinity, ease: "linear" }}
+                className="absolute inset-0 bg-[conic-gradient(from_0deg,transparent,rgba(234,179,8,0.1),transparent)] rounded-3xl pointer-events-none"
+              />
+              <div className="relative z-10 flex flex-col items-center">
+                <Flame className="text-yellow-500 mb-6" size={80} strokeWidth={1.5} />
+                <h1 className="text-6xl font-black font-display text-transparent bg-clip-text bg-gradient-to-b from-yellow-300 to-amber-600 mb-4 tracking-tighter">LEVEL UP!</h1>
+                <p className="text-yellow-500/80 text-xl uppercase tracking-[0.3em] font-bold">You are now Level {user.level}</p>
+                <div className="mt-8 flex items-center gap-4 text-[#b8b3a0]">
+                  <Coins className="text-yellow-500" size={24} />
+                  <span className="font-mono text-lg">+50 Bonus Gold</span>
+                </div>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       {/* Decorative Grid with Premium Yellow/Gold Tint */}
       <div className="absolute inset-0 bg-[linear-gradient(to_right,#eab30807_1px,transparent_1px),linear-gradient(to_bottom,#eab30807_1px,transparent_1px)] bg-[size:36px_36px] pointer-events-none z-0"></div>
       
@@ -207,15 +251,66 @@ export default function Dashboard() {
         </div>
 
         <div className="grid grid-cols-2 gap-3">
-          <div className="glass-card p-4 flex flex-col items-center justify-center gap-1.5 bg-[#211d15]/95 border border-yellow-500/15 rounded-2xl">
-            <Flame className="text-yellow-500" size={20} />
-            <div className="text-xl font-black font-display text-[#fdfcf9]">{user.streak}</div>
-            <div className="text-[10px] text-[#b8b3a0]/60 font-bold uppercase tracking-wider">Day Streak</div>
+          <div className="glass-card p-4 flex flex-col items-center justify-center gap-2 bg-[#211d15]/95 border border-yellow-500/15 rounded-2xl">
+            <div className="flex items-center gap-2">
+              <Flame className="text-yellow-500" size={20} />
+              <div className="text-xl font-black font-display text-[#fdfcf9]">{user.streak}</div>
+            </div>
+            <div className="text-[10px] text-[#b8b3a0]/60 font-bold uppercase tracking-wider text-center leading-tight">Focus Dungeon<br/>Streak</div>
+            <div className="flex gap-1 mt-1">
+              {[...Array(7)].map((_, i) => (
+                <div key={i} className={`w-2 h-2 rounded-full ${(user.streak % 7 > i || (user.streak > 0 && user.streak % 7 === 0)) ? 'bg-yellow-500 shadow-[0_0_8px_rgba(234,179,8,0.8)]' : 'bg-[#1a1711] border border-white/5'}`} />
+              ))}
+            </div>
           </div>
           <div className="glass-card p-4 flex flex-col items-center justify-center gap-1.5 bg-[#211d15]/95 border border-yellow-500/15 rounded-2xl">
             <Coins className="text-yellow-500" size={20} />
             <div className="text-xl font-black font-display text-[#fdfcf9]">{user.coins}</div>
             <div className="text-[10px] text-[#b8b3a0]/60 font-bold uppercase tracking-wider">Gold</div>
+          </div>
+        </div>
+
+        <div className="glass-card p-4 border border-yellow-500/15 bg-[#211d15]/95 rounded-2xl flex flex-col gap-3">
+          <div className="flex items-center justify-between mb-1">
+            <div className="flex items-center gap-2">
+              <Users className="text-yellow-500" size={16} />
+              <h3 className="font-bold text-sm text-[#fdfcf9]">Rivals</h3>
+            </div>
+            <button className="text-[10px] bg-yellow-500/20 hover:bg-yellow-500/30 text-yellow-500 font-bold px-2 py-1 rounded flex items-center gap-1 transition-colors cursor-pointer">
+              <UserPlus size={10} /> Invite
+            </button>
+          </div>
+          
+          <div className="flex flex-col gap-1.5 mb-2">
+            <div className="flex justify-between text-[10px] font-bold">
+              <span className="text-[#b8b3a0]">Shared Goal: Defeat Assignment Dragon</span>
+              <span className="text-yellow-500">{party.reduce((acc, p) => acc + p.xp, 0).toLocaleString()} / 25,000 XP</span>
+            </div>
+            <div className="w-full bg-black/50 rounded-full h-1.5 overflow-hidden">
+              <div 
+                className="bg-yellow-500 h-full transition-all duration-1000"
+                style={{ width: `${Math.min(100, (party.reduce((acc, p) => acc + p.xp, 0) / 25000) * 100)}%` }}
+              />
+            </div>
+          </div>
+
+          <div className="space-y-2">
+            {party.map((member, idx) => (
+              <div key={member.id} className={`flex items-center justify-between p-2 rounded-lg border ${member.isCurrentUser ? 'bg-yellow-500/10 border-yellow-500/30' : 'bg-[#16130e]/50 border-white/5'}`}>
+                <div className="flex items-center gap-3">
+                  <div className="text-xs font-bold text-yellow-500/70 w-4 text-center">#{idx + 1}</div>
+                  <div>
+                    <div className="font-bold text-sm text-[#fdfcf9] flex items-center gap-1.5">
+                      {member.name} {member.isCurrentUser && <span className="text-[8px] bg-yellow-500 text-black px-1 py-0.5 rounded uppercase">You</span>}
+                    </div>
+                  </div>
+                </div>
+                <div className="text-right flex flex-col items-end">
+                  <div className="text-sm font-black text-yellow-500 font-display">Lvl {member.level}</div>
+                  <div className="text-[9px] font-mono text-[#b8b3a0]/60">{member.xp.toLocaleString()} XP</div>
+                </div>
+              </div>
+            ))}
           </div>
         </div>
 
@@ -227,7 +322,8 @@ export default function Dashboard() {
           <p className="text-xs text-[#b8b3a0] mb-4 leading-relaxed font-medium">Embark on a 25-minute study/work session to secure double multipliers.</p>
           <button 
             onClick={() => {
-              setChatHistory(prev => [...prev, { role: 'gm', text: "Focus Dungeon initialized. The gates close behind you. Complete your tasks to escape."}]);
+              playClickSfx();
+              navigate('/dungeon');
             }}
             className="w-full py-2.5 bg-yellow-500 hover:bg-yellow-400 text-black rounded-xl font-bold transition-all flex justify-center items-center gap-2 text-xs cursor-pointer shadow-md"
           >
@@ -259,7 +355,20 @@ export default function Dashboard() {
       <main className="flex-1 p-6 md:p-10 overflow-y-auto bg-transparent flex flex-col gap-6 relative z-10">
         <header className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
           <div>
-            <h1 className="text-3xl font-extrabold font-display tracking-tight mb-1 text-[#fdfcf9]">Active Quests</h1>
+            <div className="flex items-center gap-4 mb-2">
+              <h1 
+                className={`text-2xl md:text-3xl font-extrabold font-display tracking-tight cursor-pointer transition-colors ${activeView === 'quests' ? 'text-[#fdfcf9]' : 'text-[#fdfcf9]/40 hover:text-[#fdfcf9]/80'}`}
+                onClick={() => setActiveView('quests')}
+              >
+                Active Quests
+              </h1>
+              <h1 
+                className={`text-2xl md:text-3xl font-extrabold font-display tracking-tight cursor-pointer transition-colors ${activeView === 'roadmap' ? 'text-yellow-500' : 'text-yellow-500/40 hover:text-yellow-500/80'}`}
+                onClick={() => setActiveView('roadmap')}
+              >
+                Roadmap
+              </h1>
+            </div>
             <p className="text-[#b8b3a0] font-semibold text-xs sm:text-sm">2 Bosses, 1 Daily remaining.</p>
           </div>
           <div className="flex items-center gap-3">
@@ -309,93 +418,101 @@ export default function Dashboard() {
           </div>
         </header>
 
-        {/* Dynamic Quest Generator Form */}
-        <TaskCard onSubmit={handleCreateQuest} isGenerating={isGeneratingQuest} />
+        {activeView === 'quests' ? (
+          <>
+            {/* Dynamic Quest Generator Form */}
+            <TaskCard onSubmit={handleCreateQuest} isGenerating={isGeneratingQuest} />
 
-        {/* Analytics row */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          {[
-            { label: 'Completion Rate', value: '88%', trend: '+5%' },
-            { label: 'Focus Time', value: '24h 12m', trend: '+2h' },
-            { label: 'Survival Rate', value: '95%', trend: '+1%' },
-            { label: 'Bosses Defeated', value: '14', trend: 'Epic' },
-          ].map((stat, i) => (
-            <div key={i} className="glass-card p-4 flex flex-col justify-center bg-[#16130e]/90 border border-yellow-500/15 rounded-2xl shadow-md">
-              <div className="text-[10px] font-black text-[#b8b3a0]/50 uppercase tracking-wider mb-1">{stat.label}</div>
-              <div className="flex items-end gap-2">
-                <div className="text-2xl font-black font-display text-[#fdfcf9]">{stat.value}</div>
-                <div className="text-xs font-bold text-yellow-500 mb-0.5">{stat.trend}</div>
-              </div>
-            </div>
-          ))}
-        </div>
-
-        {/* Quests Container */}
-        <div className="space-y-4 max-w-4xl flex-1">
-          <AnimatePresence>
-            {quests.filter(Boolean).map(quest => (
-              <motion.div 
-                key={quest.id}
-                layout
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                className={`glass-card p-6 border-l-4 ${quest.type === 'boss' ? 'border-l-red-500' : 'border-l-yellow-500'} bg-[#16130e]/95 border border-yellow-500/15 rounded-3xl shadow-xl`}
-              >
-                <div className="flex flex-col sm:flex-row justify-between items-start gap-4 mb-5">
-                  <div>
-                    <div className="flex flex-wrap items-center gap-2 mb-1">
-                      <h3 className="text-lg font-extrabold font-display text-[#fdfcf9]">{quest.title}</h3>
-                      {quest.type === 'boss' ? (
-                        <span className="px-2.5 py-0.5 rounded-full bg-red-500/20 text-red-400 text-[10px] font-black uppercase tracking-wide border border-red-500/30">
-                          Boss Battle
-                        </span>
-                      ) : (
-                        <span className="px-2.5 py-0.5 rounded-full bg-yellow-500/20 text-yellow-400 text-[10px] font-black uppercase tracking-wide border border-yellow-500/30">
-                          Main Quest
-                        </span>
-                      )}
-                    </div>
-                    <div className="text-xs text-[#b8b3a0]/70 font-bold flex items-center gap-1.5">
-                      <AlertTriangle size={12} className={quest.riskScore === 'high' ? 'text-red-500' : 'text-yellow-500'} />
-                      Deadline: {new Date(quest.deadline).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
-                    </div>
+            {/* Analytics row */}
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              {[
+                { label: 'Completion Rate', value: '88%', trend: '+5%' },
+                { label: 'Focus Time', value: '24h 12m', trend: '+2h' },
+                { label: 'Survival Rate', value: '95%', trend: '+1%' },
+                { label: 'Bosses Defeated', value: '14', trend: 'Epic' },
+              ].map((stat, i) => (
+                <div key={i} className="glass-card p-4 flex flex-col justify-center bg-[#16130e]/90 border border-yellow-500/15 rounded-2xl shadow-md">
+                  <div className="text-[10px] font-black text-[#b8b3a0]/50 uppercase tracking-wider mb-1">{stat.label}</div>
+                  <div className="flex items-end gap-2">
+                    <div className="text-2xl font-black font-display text-[#fdfcf9]">{stat.value}</div>
+                    <div className="text-xs font-bold text-yellow-500 mb-0.5">{stat.trend}</div>
                   </div>
-                  
-                  {quest.type === 'boss' && (
-                    <div className="text-left sm:text-right">
-                      <div className="text-[9px] font-mono font-bold text-[#b8b3a0]/50 mb-1">BOSS HP</div>
-                      <div className="w-32 h-2.5 bg-black/40 border border-yellow-500/15 rounded-full overflow-hidden flex justify-end">
-                         <motion.div 
-                           animate={{ width: `${(quest.health / quest.maxHealth) * 100}%` }}
-                           className="h-full bg-gradient-to-r from-red-500 to-yellow-500 rounded-full origin-right"
-                         />
-                      </div>
-                    </div>
-                  )}
                 </div>
+              ))}
+            </div>
 
-                <div className="space-y-2">
-                  {quest.tasks.map(task => (
-                    <div 
-                      key={task.id}
-                      onClick={() => handleTaskToggle(quest.id, task.id, task.completed)}
-                      className={`flex items-center gap-3 p-3 rounded-xl cursor-pointer transition-colors ${task.completed ? 'bg-yellow-500/5' : 'hover:bg-white/5 border border-transparent hover:border-yellow-500/10'}`}
-                    >
-                      {task.completed ? (
-                        <CheckCircle2 className="text-yellow-400 shrink-0" size={18} />
-                      ) : (
-                        <Circle className="text-[#b8b3a0]/40 shrink-0 hover:text-yellow-500" size={18} />
+            {/* Quests Container */}
+            <div className="space-y-4 max-w-4xl flex-1">
+              <AnimatePresence>
+                {quests.filter(Boolean).map(quest => (
+                  <motion.div 
+                    key={quest.id}
+                    layout
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    className={`glass-card p-6 border-l-4 ${quest.type === 'boss' ? 'border-l-red-500' : 'border-l-yellow-500'} bg-[#16130e]/95 border border-yellow-500/15 rounded-3xl shadow-xl`}
+                  >
+                    <div className="flex flex-col sm:flex-row justify-between items-start gap-4 mb-5">
+                      <div>
+                        <div className="flex flex-wrap items-center gap-2 mb-1">
+                          <h3 className="text-lg font-extrabold font-display text-[#fdfcf9]">{quest.title}</h3>
+                          {quest.type === 'boss' ? (
+                            <span className="px-2.5 py-0.5 rounded-full bg-red-500/20 text-red-400 text-[10px] font-black uppercase tracking-wide border border-red-500/30">
+                              Boss Battle
+                            </span>
+                          ) : (
+                            <span className="px-2.5 py-0.5 rounded-full bg-yellow-500/20 text-yellow-400 text-[10px] font-black uppercase tracking-wide border border-yellow-500/30">
+                              Main Quest
+                            </span>
+                          )}
+                        </div>
+                        <div className="text-xs text-[#b8b3a0]/70 font-bold flex items-center gap-1.5">
+                          <AlertTriangle size={12} className={quest.riskScore === 'high' ? 'text-red-500' : 'text-yellow-500'} />
+                          Deadline: {new Date(quest.deadline).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
+                        </div>
+                      </div>
+                      
+                      {quest.type === 'boss' && (
+                        <div className="text-left sm:text-right">
+                          <div className="text-[9px] font-mono font-bold text-[#b8b3a0]/50 mb-1">BOSS HP</div>
+                          <div className="w-32 h-2.5 bg-black/40 border border-yellow-500/15 rounded-full overflow-hidden flex justify-end">
+                             <motion.div 
+                               animate={{ width: `${(quest.health / quest.maxHealth) * 100}%` }}
+                               className="h-full bg-gradient-to-r from-red-500 to-yellow-500 rounded-full origin-right"
+                             />
+                          </div>
+                        </div>
                       )}
-                      <span className={`text-sm font-semibold ${task.completed ? 'text-[#b8b3a0]/40 line-through' : 'text-[#fdfcf9]/90'}`}>
-                        {task.title}
-                      </span>
                     </div>
-                  ))}
-                </div>
-              </motion.div>
-            ))}
-          </AnimatePresence>
-        </div>
+
+                    <div className="space-y-2">
+                      {quest.tasks.map(task => (
+                        <div 
+                          key={task.id}
+                          onClick={() => handleTaskToggle(quest.id, task.id, task.completed)}
+                          className={`flex items-center gap-3 p-3 rounded-xl cursor-pointer transition-colors ${task.completed ? 'bg-yellow-500/5' : 'hover:bg-white/5 border border-transparent hover:border-yellow-500/10'}`}
+                        >
+                          {task.completed ? (
+                            <CheckCircle2 className="text-yellow-400 shrink-0" size={18} />
+                          ) : (
+                            <Circle className="text-[#b8b3a0]/40 shrink-0 hover:text-yellow-500" size={18} />
+                          )}
+                          <span className={`text-sm font-semibold ${task.completed ? 'text-[#b8b3a0]/40 line-through' : 'text-[#fdfcf9]/90'}`}>
+                            {task.title}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </motion.div>
+                ))}
+              </AnimatePresence>
+            </div>
+          </>
+        ) : (
+          <div className="flex-1 w-full relative">
+            <D3ForceGraph quests={quests} />
+          </div>
+        )}
       </main>
 
       {/* AI Game Master Panel */}
