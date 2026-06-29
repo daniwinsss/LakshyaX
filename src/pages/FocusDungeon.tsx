@@ -28,7 +28,9 @@ export default function FocusDungeon() {
       .then(setUser);
     fetch("/api/quests")
       .then((res) => res.json())
-      .then(setQuests);
+      .then(data => {
+        if (Array.isArray(data)) setQuests(data);
+      });
   }, []);
 
   useEffect(() => {
@@ -254,7 +256,7 @@ export default function FocusDungeon() {
               </div>
 
               <div className="space-y-2">
-                {selectedQuest.tasks.map((task) => (
+                {selectedQuest.tasks?.map((task) => (
                   <div
                     key={task.id}
                     className={`flex items-center gap-3 p-3 rounded-xl border ${task.completed ? "bg-red-500/10 border-red-500/30 opacity-75" : "bg-[#211d15]/50 border-white/5 hover:bg-[#211d15]"} transition-all`}

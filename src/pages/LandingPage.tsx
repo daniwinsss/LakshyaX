@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { motion, useScroll, useTransform, useMotionValue, useSpring } from "framer-motion";
+import { motion, useScroll, useTransform, useMotionValue, useSpring, Variants } from "framer-motion";
 import { useNavigate } from "react-router-dom";
 import {
   Sword,
@@ -20,7 +20,8 @@ import {
   Cpu,
   BrainCircuit,
   Network,
-  Moon
+  Moon,
+  Map
 } from "lucide-react";
 import FeatureFlashcard from "../components/FeatureFlashcard";
 import { Interactive3DCard } from "../components/Interactive3DCard";
@@ -61,16 +62,16 @@ export default function LandingPage() {
   const heroScrollScale = useTransform(scrollY, [0, 1200], [1, 0.98]);
 
   // Reveal animation helper variant
-  const revealVariants = {
+  const revealVariants: Variants = {
     hidden: { opacity: 0, y: 40 },
     visible: {
       opacity: 1,
       y: 0,
       transition: { 
         duration: 0.8, 
-        ease: [0.16, 1, 0.3, 1],
+        ease: [0.16, 1, 0.3, 1] as any,
         staggerChildren: 0.15,
-      },
+      } as any,
     },
   };
 
@@ -120,7 +121,7 @@ export default function LandingPage() {
     },
   };
 
-  const heroItemVariants = {
+  const heroItemVariants: Variants = {
     hidden: { opacity: 0, y: 30 },
     visible: {
       opacity: 1,
@@ -233,6 +234,66 @@ export default function LandingPage() {
       statLabel: "Import Speed",
       statValue: "Instant",
       difficulty: "Automated",
+    },
+    {
+      id: 8,
+      icon: BrainCircuit,
+      title: "RAG Knowledge Pipeline",
+      shortHook:
+        "Augments the AI Game Master with external knowledge context.",
+      detailedDesc:
+        "Retrieval-Augmented Generation provides context-aware quest descriptions and smart breakdowns of your tasks based on personal data and past performance.",
+      flavorText:
+        "The Game Master consults the ancient knowledge scrolls.",
+      badge: "Context Aware",
+      statLabel: "Knowledge Depth",
+      statValue: "Infinite",
+      difficulty: "High Intelligence",
+    },
+    {
+      id: 9,
+      icon: Target,
+      title: "SM2 Spaced Repetition",
+      shortHook:
+        "Intelligently schedules recurring habits based on your mastery.",
+      detailedDesc:
+        "Uses the SuperMemo 2 algorithm to determine the optimal interval for reviewing habits and tasks, ensuring long-term retention and mastery.",
+      flavorText:
+        "Mastery requires discipline and perfect timing.",
+      badge: "Adaptive Memory",
+      statLabel: "Retention Rate",
+      statValue: "+85%",
+      difficulty: "Calculated",
+    },
+    {
+      id: 10,
+      icon: Zap,
+      title: "Unbreakable Streaks",
+      shortHook:
+        "Maintain your momentum with continuous daily questing.",
+      detailedDesc:
+        "Rewards consistent daily engagement. Keep your streak alive to earn multiplier bonuses on XP, gold, and unlock legendary character classes.",
+      flavorText:
+        "The fire of ambition burns brighter every consecutive day.",
+      badge: "Consistency",
+      statLabel: "Momentum Bonus",
+      statValue: "Multiplier x2",
+      difficulty: "Endurance",
+    },
+    {
+      id: 11,
+      icon: Map,
+      title: "Interactive Quest Roadmap",
+      shortHook:
+        "Visualize your journey with a dynamic knowledge graph roadmap.",
+      detailedDesc:
+        "Uses D3 Force-Directed Graphs to map out your active quests and tasks, visually connecting dependencies so you can strategize your path to victory.",
+      flavorText:
+        "The territory is unmapped, but the path is clear.",
+      badge: "Strategic Overview",
+      statLabel: "Nodes Mapped",
+      statValue: "Dynamic",
+      difficulty: "Cartography",
     },
   ];
 
@@ -367,9 +428,6 @@ export default function LandingPage() {
           </div>
 
           <div className="flex items-center gap-4">
-            <button className="w-10 h-10 rounded-full border border-white/10 flex items-center justify-center text-[#b8b3a0] hover:text-white hover:bg-white/5 transition-all hidden sm:flex">
-              <Moon size={18} />
-            </button>
             <button
               onClick={() => {
                 playClickSfx();
@@ -744,7 +802,7 @@ export default function LandingPage() {
               initial={{ opacity: 0, x: -100 }}
               whileInView={{ opacity: 1, x: 0 }}
               viewport={{ once: true, margin: "-100px" }}
-              transition={{ duration: 0.8, ease: [0.16, 1, 0.3, 1] }}
+              transition={{ duration: 0.8, ease: [0.16, 1, 0.3, 1] as any }}
               whileHover={{ y: -4 }}
               className="w-full md:w-[48%] bg-[#12100d] border border-yellow-500/30 rounded-3xl p-8 relative shadow-[0_0_40px_rgba(234,179,8,0.25)] group hover:border-yellow-500/60 hover:shadow-[0_0_60px_rgba(234,179,8,0.4)] transition-[border-color,box-shadow] duration-500 overflow-hidden"
             >
@@ -805,7 +863,7 @@ export default function LandingPage() {
               initial={{ opacity: 0, x: 100 }}
               whileInView={{ opacity: 1, x: 0 }}
               viewport={{ once: true, margin: "-100px" }}
-              transition={{ duration: 0.8, ease: [0.16, 1, 0.3, 1] }}
+              transition={{ duration: 0.8, ease: [0.16, 1, 0.3, 1] as any }}
               whileHover={{ y: -4 }}
               className="w-full md:w-[48%] bg-[#12100d] border border-amber-500/30 rounded-3xl p-8 relative shadow-[0_0_40px_rgba(245,158,11,0.25)] group hover:border-amber-500/60 hover:shadow-[0_0_60px_rgba(245,158,11,0.4)] transition-[border-color,box-shadow] duration-500 overflow-hidden"
             >
@@ -850,7 +908,7 @@ export default function LandingPage() {
               initial={{ opacity: 0, x: -100 }}
               whileInView={{ opacity: 1, x: 0 }}
               viewport={{ once: true, margin: "-100px" }}
-              transition={{ duration: 0.8, ease: [0.16, 1, 0.3, 1] }}
+              transition={{ duration: 0.8, ease: [0.16, 1, 0.3, 1] as any }}
               whileHover={{ y: -4 }}
               className="w-full md:w-[48%] bg-[#12100d] border border-orange-500/30 rounded-3xl p-8 relative shadow-[0_0_40px_rgba(249,115,22,0.25)] group hover:border-orange-500/60 hover:shadow-[0_0_60px_rgba(249,115,22,0.4)] transition-[border-color,box-shadow] duration-500 overflow-hidden"
             >
@@ -911,7 +969,7 @@ export default function LandingPage() {
               initial={{ opacity: 0, x: 100 }}
               whileInView={{ opacity: 1, x: 0 }}
               viewport={{ once: true, margin: "-100px" }}
-              transition={{ duration: 0.8, ease: [0.16, 1, 0.3, 1] }}
+              transition={{ duration: 0.8, ease: [0.16, 1, 0.3, 1] as any }}
               whileHover={{ y: -4 }}
               className="w-full md:w-[48%] bg-[#12100d] border border-yellow-400/30 rounded-3xl p-8 relative shadow-[0_0_40px_rgba(250,204,21,0.25)] group hover:border-yellow-400/60 hover:shadow-[0_0_60px_rgba(250,204,21,0.4)] transition-[border-color,box-shadow] duration-500 overflow-hidden"
             >
@@ -934,10 +992,10 @@ export default function LandingPage() {
                 </div>
               </div>
               <p className="text-[#b8b3a0] text-sm leading-relaxed mb-6 font-medium">
-                Server-side API routing, reasoning pipeline, and graph database integration.
+                Server-side API routing, AI reasoning pipeline, spaced repetition logic, and real-time database integration.
               </p>
               <div className="flex flex-wrap gap-2 mb-8">
-                {["Express", "Node.js", "Google GenAI", "Neo4j"].map((tech) => (
+                {["Express", "Node.js", "Google GenAI", "Firebase", "SM2 Alg"].map((tech) => (
                   <span key={tech} className="px-3 py-1 bg-white/5 border border-white/10 rounded-full text-xs font-medium text-[#fdfcf9]">
                     {tech}
                   </span>
@@ -945,7 +1003,7 @@ export default function LandingPage() {
               </div>
               <div className="pt-4 border-t border-white/5 flex justify-between items-center text-xs text-[#b8b3a0]">
                 <span>Data processing</span>
-                <span className="text-yellow-400 font-semibold">Graph + semantic merge</span>
+                <span className="text-yellow-400 font-semibold">Semantic logic + real-time sync</span>
               </div>
             </motion.div>
           </div>

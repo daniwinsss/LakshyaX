@@ -94,7 +94,15 @@
   }
 }
 
-body {
+@utility scrollbar-hide {
+  &::-webkit-scrollbar {
+    display: none;
+  }
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+html, body {
   @apply bg-background text-foreground antialiased selection:bg-primary/40;
   cursor: none !important;
 }

@@ -3,6 +3,12 @@ import { motion, AnimatePresence, useMotionValue, useSpring, useTransform } from
 import { Star, Coins, Flame, ShieldAlert } from 'lucide-react';
 
 export function HeroInteractiveCard() {
+  const [user, setUser] = useState<{coins: number, streak: number, level: number, xp: number} | null>(null);
+
+  useEffect(() => {
+    fetch('/api/user').then(res => res.json()).then(setUser).catch(() => {});
+  }, []);
+
   const cardRef = useRef<HTMLDivElement>(null);
   
   // 3D Tilt State
@@ -157,7 +163,7 @@ export function HeroInteractiveCard() {
             <div className="text-left">
               <div className="text-xs font-bold text-[#b8b3a0] uppercase tracking-wider">GAME STATUS</div>
               <div className="text-sm font-black text-[#fdfcf9] flex items-center gap-1.5">
-                Lvl 12 Paladin <span className="text-xs font-bold text-yellow-500">(Daniyal)</span>
+                Lvl {user ? user.level : 12} Paladin <span className="text-xs font-bold text-yellow-500">(Daniyal)</span>
               </div>
             </div>
           </div>
@@ -224,13 +230,13 @@ export function HeroInteractiveCard() {
           <div>
             <div className="text-xs text-[#b8b3a0] font-bold">Gold Pool</div>
             <div className="text-sm font-black text-yellow-400 font-mono flex items-center justify-center gap-1 mt-0.5">
-              <Coins size={12} /> 1,240
+              <Coins size={12} /> {user ? user.coins : "1,240"}
             </div>
           </div>
           <div>
             <div className="text-xs text-[#b8b3a0] font-bold">Active streak</div>
             <div className="text-sm font-black text-yellow-500 font-mono flex items-center justify-center gap-1 mt-0.5">
-              <Flame size={12} /> 8 Days
+              <Flame size={12} /> {user ? user.streak : 8} Days
             </div>
           </div>
           <div>

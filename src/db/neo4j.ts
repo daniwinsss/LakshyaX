@@ -12,6 +12,18 @@ export const initNeo4j = () => {
     try {
       driver = neo4j.driver(uri, neo4j.auth.basic(user, password));
       console.log('Neo4j Driver initialized');
+      // Initialize vector index
+      const session = driver.session();
+      session.run(`
+        CREATE VECTOR INDEX quest_embeddings IF NOT EXISTS
+        FOR (q:Quest)
+        ON (q.embedding)
+        OPTIONS {indexConfig: {
+          \`vector.dimensions\`: 768,
+          \`vector.similarity_function\`: 'cosine'
+        }}
+      `).catch(e => console.error("Error creating vector index:", e))
+        .finally(() => session.close());
     } catch (error) {
       console.error('Failed to initialize Neo4j driver:', error);
     }
@@ -32,28 +44,49 @@ export const closeNeo4j = async () => {
 };
 
 // Example operations for Task/Quest graph
-export const saveQuestToGraph = async (quest: Quest) => {
+export const saveQuestToGraph = async (quest: Quest, embedding?: number[]) => {
   const session = getSession();
   if (!session) return;
   
   try {
     // 1. Create or update the Quest node
-    await session.run(
-      `
-      MERGE (q:Quest {id: $id})
-      SET q.title = $title, 
-          q.type = $type, 
-          q.estimatedHours = $estimatedHours,
-          q.health = $health
-      `,
-      {
-        id: quest.id,
-        title: quest.title,
-        type: quest.type,
-        estimatedHours: quest.estimatedHours || 0,
-        health: quest.health
-      }
-    );
+    if (embedding && embedding.length > 0) {
+      await session.run(
+        `
+        MERGE (q:Quest {id: $id})
+        SET q.title = $title, 
+            q.type = $type, 
+            q.estimatedHours = $estimatedHours,
+            q.health = $health,
+            q.embedding = $embedding
+        `,
+        {
+          id: quest.id,
+          title: quest.title,
+          type: quest.type || 'quest',
+          estimatedHours: quest.estimatedHours || 0,
+          health: typeof quest.health === 'number' ? quest.health : 100,
+          embedding: embedding
+        }
+      );
+    } else {
+      await session.run(
+        `
+        MERGE (q:Quest {id: $id})
+        SET q.title = $title, 
+            q.type = $type, 
+            q.estimatedHours = $estimatedHours,
+            q.health = $health
+        `,
+        {
+          id: quest.id,
+          title: quest.title,
+          type: quest.type || 'quest',
+          estimatedHours: quest.estimatedHours || 0,
+          health: typeof quest.health === 'number' ? quest.health : 100
+        }
+      );
+    }
 
     // 2. Create relationships for dependencies
     if (quest.dependencies && quest.dependencies.length > 0) {
@@ -61,8 +94,8 @@ export const saveQuestToGraph = async (quest: Quest) => {
       for (const depId of quest.dependencies) {
         await session.run(
           `
-          MATCH (q:Quest {id: $id})
-          MATCH (dep:Quest {id: $depId})
+          MERGE (q:Quest {id: $id})
+          MERGE (dep:Quest {id: $depId})
           MERGE (q)-[:DEPENDS_ON]->(dep)
           `,
           {
@@ -74,6 +107,48 @@ export const saveQuestToGraph = async (quest: Quest) => {
     }
   } catch (error) {
     console.error('Error saving quest to Neo4j:', error);
+  } finally {
+    await session.close();
+  }
+};
+
+export const findSimilarQuests = async (embedding: number[], limit: number = 3): Promise<Quest[]> => {
+  const session = getSession();
+  if (!session) return [];
+
+  try {
+    // Using vector index query
+    const result = await session.run(
+      `
+      CALL db.index.vector.queryNodes('quest_embeddings', $limit, $embedding)
+      YIELD node AS q, score
+      RETURN q, score
+      `,
+      {
+        embedding,
+        limit
+      }
+    );
+
+    return result.records.map(record => {
+      const node = record.get('q').properties;
+      return {
+        id: node.id,
+        title: node.title,
+        type: node.type,
+        estimatedHours: typeof node.estimatedHours === 'number' ? node.estimatedHours : node.estimatedHours?.toNumber?.() || 0,
+        health: typeof node.health === 'number' ? node.health : node.health?.toNumber?.() || 100,
+        maxHealth: 100,
+        deadline: new Date().toISOString(),
+        tasks: [],
+        rewards: { xp: 0, coins: 0 },
+        riskScore: 'medium',
+        dependencies: []
+      } as Quest;
+    });
+  } catch (error) {
+    console.error('Error finding similar quests in Neo4j:', error);
+    return [];
   } finally {
     await session.close();
   }

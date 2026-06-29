@@ -6,12 +6,23 @@ export interface UserData {
   streak: number;
   lastDungeonDate?: string;
   productivityScore: number;
+  friends?: string[];
+  friendRequests?: string[];
+  sentRequests?: string[];
+}
+
+export interface SM2Data {
+  repetition: number;
+  easinessFactor: number;
+  interval: number;
+  nextReviewDate: string;
 }
 
 export interface Task {
   id: string;
   title: string;
   completed: boolean;
+  sm2Data?: SM2Data; // For spaced repetition tasks
 }
 
 export interface Quest {
@@ -26,4 +37,6 @@ export interface Quest {
   riskScore: 'low' | 'medium' | 'high';
   dependencies?: string[];
   estimatedHours?: number;
+  embedding?: number[];
+  sm2Data?: SM2Data;
 }

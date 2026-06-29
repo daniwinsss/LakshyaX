@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { Sword, Target, Flame, Coins, BrainCircuit, Play, CheckCircle2, Circle, AlertTriangle, MessageSquare, Volume2, ArrowLeft, Shield, Users, UserPlus } from 'lucide-react';
-import { Joyride, Step, TooltipRenderProps } from 'react-joyride';
+import { Sword, Target, Flame, Coins, BrainCircuit, Play, CheckCircle2, Circle, AlertTriangle, MessageSquare, Volume2, ArrowLeft, Shield, Users, UserPlus, Trash2 } from 'lucide-react';
+import Joyride, { Step, TooltipRenderProps } from 'react-joyride';
 import { UserData, Quest } from '../types';
+import { calculateSM2 } from '../utils/sm2';
 import TaskCard from '../components/TaskCard';
 import { D3ForceGraph } from '../components/D3ForceGraph';
 import { playClickSfx, playSuccessSfx, playQuestSpawnSfx } from '../utils/audio';
@@ -65,12 +66,15 @@ const CustomTooltip = ({
   </div>
 );
 
+import { FriendsModal } from '../components/FriendsModal';
+
 export default function Dashboard() {
   const navigate = useNavigate();
   const location = useLocation();
   const [user, setUser] = useState<UserData | null>(null);
   const [quests, setQuests] = useState<Quest[]>([]);
   const [isGeneratingQuest, setIsGeneratingQuest] = useState(false);
+  const [isFriendsModalOpen, setIsFriendsModalOpen] = useState(false);
   const [chatMessage, setChatMessage] = useState('');
   const [chatHistory, setChatHistory] = useState<{role: 'user' | 'gm', text: string}[]>([
     { role: 'gm', text: "Welcome back, Player. The Assignment Dragon has grown stronger while you rested. You have 18 hours remaining." }
@@ -79,6 +83,7 @@ export default function Dashboard() {
   const [isVoiceActive, setIsVoiceActive] = useState(false);
   const [activeView, setActiveView] = useState<'quests' | 'roadmap'>('quests');
   const [showLevelUp, setShowLevelUp] = useState(false);
+  const [floatingXp, setFloatingXp] = useState<{ id: string, amount: number } | null>(null);
   const [party, setParty] = useState<{id: string, name: string, level: number, xp: number, isCurrentUser: boolean}[]>([]);
   
   const [runTour, setRunTour] = useState(false);
@@ -130,8 +135,12 @@ export default function Dashboard() {
 
   useEffect(() => {
     fetch('/api/user').then(res => res.json()).then(setUser);
-    fetch('/api/quests').then(res => res.json()).then(setQuests);
-    fetch('/api/leaderboard').then(res => res.json()).then(data => setParty(data.party));
+    fetch('/api/quests').then(res => res.json()).then(data => {
+      if (Array.isArray(data)) setQuests(data);
+    });
+    fetch('/api/leaderboard').then(res => res.json()).then(data => {
+      if (data && Array.isArray(data.party)) setParty(data.party);
+    });
     
     // Check if we should start the tour
     const searchParams = new URLSearchParams(location.search);
@@ -157,7 +166,14 @@ export default function Dashboard() {
     if (data.success && data.quest) {
       setUser(data.user);
       setQuests(prev => prev.map(q => q && q.id === questId ? data.quest : q).filter(Boolean));
-      fetch('/api/leaderboard').then(res => res.json()).then(data => setParty(data.party));
+      fetch('/api/leaderboard').then(res => res.json()).then(data => {
+        if (data && Array.isArray(data.party)) setParty(data.party);
+      });
+      
+      if (!currentStatus) {
+        setFloatingXp({ id: taskId, amount: 20 });
+        setTimeout(() => setFloatingXp(null), 1000);
+      }
       
       if (data.leveledUp) {
         setShowLevelUp(true);
@@ -169,16 +185,61 @@ export default function Dashboard() {
     }
   };
 
-  const handleCreateQuest = async (title: string, deadline?: string) => {
+  const handleCreateQuest = async (title: string, deadline?: string, isHabit?: boolean) => {
     playQuestSpawnSfx();
     setIsGeneratingQuest(true);
+
+    if (isHabit) {
+      setChatHistory(prev => [...prev, { role: 'gm', text: `✨ Registering "${title}" as a recurring Daily Habit...`}]);
+      const newQuest: Quest = {
+        id: String(Date.now()),
+        title: title,
+        type: 'daily',
+        deadline: deadline || new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
+        health: 100,
+        maxHealth: 100,
+        tasks: [{ id: `t_${Date.now()}`, title: 'Complete today', completed: false }],
+        rewards: { xp: 200, coins: 50 },
+        riskScore: 'low',
+        sm2Data: {
+          interval: 1,
+          repetition: 0,
+          easinessFactor: 2.5,
+          nextReviewDate: new Date().toISOString()
+        }
+      };
+
+      try {
+        const response = await fetch('/api/quests', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(newQuest)
+        });
+        const result = await response.json();
+        if (result.success) {
+          setQuests(prev => [result.quest, ...prev.filter(Boolean)]);
+          setChatHistory(prev => [...prev, { role: 'gm', text: `⚔️ Habit established! "${title}" added to your daily routines.`}]);
+        }
+      } catch (err) {
+        console.error("Failed to sync habit to server:", err);
+        setChatHistory(prev => [...prev, { role: 'gm', text: `⚔️ Failed to establish habit "${title}".`}]);
+      } finally {
+        setIsGeneratingQuest(false);
+      }
+      return;
+    }
+
     setChatHistory(prev => [...prev, { role: 'gm', text: `✨ Analyzing "${title}" to generate customized multi-phase Quest chain...`}]);
     
     try {
       const genResponse = await fetch('/api/generate-quest', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ title, deadline })
+        body: JSON.stringify({ 
+          title, 
+          deadline,
+          existingQuests: quests.filter(Boolean).map(q => ({ id: q.id, title: q.title }))
+        })
       });
       const generated = await genResponse.json();
       const difficulty = generated.difficulty || 'medium';
@@ -192,7 +253,8 @@ export default function Dashboard() {
         maxHealth: 100,
         tasks: generated.tasks || [],
         rewards: { xp: difficulty === 'high' ? 800 : 450, coins: difficulty === 'high' ? 200 : 90 },
-        riskScore: difficulty
+        riskScore: difficulty,
+        dependencies: generated.dependencies || []
       };
       
       const response = await fetch('/api/quests', {
@@ -210,6 +272,20 @@ export default function Dashboard() {
       setChatHistory(prev => [...prev, { role: 'gm', text: `⚔️ Failed to generate quest for "${title}".`}]);
     } finally {
       setIsGeneratingQuest(false);
+    }
+  };
+
+  const handleDeleteQuest = async (questId: string) => {
+    try {
+      const response = await fetch(`/api/quests/${questId}`, {
+        method: 'DELETE',
+      });
+      if (response.ok) {
+        setQuests(prev => prev.filter(q => q && q.id !== questId));
+        setChatHistory(prev => [...prev, { role: 'gm', text: `🗑️ Quest removed from the annals.`}]);
+      }
+    } catch (err) {
+      console.error("Failed to delete quest:", err);
     }
   };
 
@@ -263,7 +339,7 @@ export default function Dashboard() {
   const xpPercentage = (user.xp / user.xpToNextLevel) * 100;
 
   return (
-    <div className="min-h-screen bg-[#0c0a07] text-[#fdfcf9] flex flex-col md:flex-row overflow-hidden h-screen font-sans relative">
+    <div className="min-h-screen bg-[#0c0a07] text-[#fdfcf9] flex flex-col md:flex-row font-sans relative">
       <Joyride
         steps={tourSteps}
         run={runTour}
@@ -337,7 +413,7 @@ export default function Dashboard() {
       <div className="absolute bottom-[-10%] right-[30%] w-[500px] h-[500px] rounded-full bg-gradient-to-bl from-amber-500/5 via-yellow-600/5 to-transparent blur-[120px] pointer-events-none z-0"></div>
 
       {/* Sidebar - Player Stats */}
-      <aside className="w-full md:w-80 border-r border-yellow-500/10 bg-[#16130e]/95 p-6 flex flex-col gap-6 shrink-0 overflow-y-auto hidden md:flex relative z-10">
+      <aside className="w-full md:w-80 border-r border-yellow-500/10 bg-[#16130e]/95 p-6 flex flex-col gap-6 shrink-0 overflow-y-auto scrollbar-hide hidden md:flex relative z-10 md:sticky md:top-0 md:h-screen">
         <div className="flex items-center justify-between">
           <button 
             onClick={() => {
@@ -414,8 +490,8 @@ export default function Dashboard() {
               <Users className="text-yellow-500" size={16} />
               <h3 className="font-bold text-sm text-[#fdfcf9]">Rivals</h3>
             </div>
-            <button className="text-[10px] bg-yellow-500/20 hover:bg-yellow-500/30 text-yellow-500 font-bold px-2 py-1 rounded flex items-center gap-1 transition-colors cursor-pointer">
-              <UserPlus size={10} /> Invite
+            <button onClick={() => setIsFriendsModalOpen(true)} className="text-[10px] bg-yellow-500/20 hover:bg-yellow-500/30 text-yellow-500 font-bold px-2 py-1 rounded flex items-center gap-1 transition-colors cursor-pointer">
+              <UserPlus size={10} /> Manage Rivals
             </button>
           </div>
           
@@ -490,9 +566,9 @@ export default function Dashboard() {
       </aside>
 
       {/* Main Content - Quests & Bosses */}
-      <main className="flex-1 p-6 md:p-10 overflow-y-auto bg-transparent flex flex-col gap-6 relative z-10">
-        <header className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-          <div>
+      <main className="flex-1 min-w-0 p-6 md:p-10 bg-transparent flex flex-col gap-6 relative z-10">
+        <header className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-6">
+          <div className="shrink-0">
             <div className="flex items-center gap-4 mb-2">
               <h1 
                 className={`text-2xl md:text-3xl font-extrabold font-display tracking-tight cursor-pointer transition-colors ${activeView === 'quests' ? 'text-[#fdfcf9]' : 'text-[#fdfcf9]/40 hover:text-[#fdfcf9]/80'}`}
@@ -509,7 +585,46 @@ export default function Dashboard() {
             </div>
             <p className="text-[#b8b3a0] font-semibold text-xs sm:text-sm">2 Bosses, 1 Daily remaining.</p>
           </div>
-          <div className="flex items-center gap-3">
+          <div className="flex flex-wrap items-center gap-3 w-full lg:w-auto">
+            <button 
+              onClick={() => {
+                setChatHistory(prev => [...prev, { role: 'gm', text: "Scanning your Google Classroom... I've detected a new 'Advanced Mathematics Assignment' threat due next week. Adding it to your quest log."}]);
+                setTimeout(async () => {
+                  const newQuest: Quest = {
+                    id: "4",
+                    title: "Advanced Mathematics Assignment",
+                    type: "quest",
+                    deadline: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
+                    health: 100,
+                    maxHealth: 100,
+                    tasks: [
+                      { id: "t8", title: "Complete Chapter 4 Exercises", completed: false },
+                      { id: "t9", title: "Submit Online Worksheet", completed: false }
+                    ],
+                    rewards: { xp: 800, coins: 150 },
+                    riskScore: "medium"
+                  };
+                  try {
+                    const response = await fetch('/api/quests', {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify(newQuest)
+                    });
+                    const result = await response.json();
+                    if (result.success) {
+                      setQuests(prev => [result.quest, ...prev.filter(q => q && q.id !== "4")]);
+                    }
+                  } catch (err) {
+                    console.error("Failed to sync scanned quest to server:", err);
+                    setQuests(prev => [newQuest, ...prev.filter(q => q && q.id !== "4")]);
+                  }
+                }, 2000);
+              }}
+              className="px-4 py-2 bg-[#16130e]/85 rounded-full border border-yellow-500/15 text-xs sm:text-sm font-bold shadow-sm flex items-center gap-2 hover:bg-[#211d15] text-[#fdfcf9] transition-colors cursor-pointer whitespace-nowrap flex-shrink-0"
+            >
+              <svg className="w-4 h-4 text-green-500" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2L1 12h3v9h6v-6h4v6h6v-9h3L12 2z"/></svg>
+              Scan Classroom
+            </button>
             <button 
               onClick={() => {
                 setChatHistory(prev => [...prev, { role: 'gm', text: "Scanning your Gmail and Calendar... I've detected a new 'System Design Interview' threat on Thursday. Adding it to your quest log."}]);
@@ -544,15 +659,11 @@ export default function Dashboard() {
                   }
                 }, 2000);
               }}
-              className="px-4 py-2 bg-[#16130e]/85 rounded-full border border-yellow-500/15 text-xs sm:text-sm font-bold shadow-sm flex items-center gap-2 hover:bg-[#211d15] text-[#fdfcf9] transition-colors cursor-pointer"
+              className="px-4 py-2 bg-[#16130e]/85 rounded-full border border-yellow-500/15 text-xs sm:text-sm font-bold shadow-sm flex items-center gap-2 hover:bg-[#211d15] text-[#fdfcf9] transition-colors cursor-pointer whitespace-nowrap flex-shrink-0"
             >
               <svg className="w-4 h-4 text-red-500" viewBox="0 0 24 24" fill="currentColor"><path d="M24 5.457v13.909c0 .904-.732 1.636-1.636 1.636h-3.819V11.73L12 16.64l-6.545-4.91v9.273H1.636A1.636 1.636 0 0 1 0 19.366V5.457c0-2.023 2.309-3.178 3.927-1.964L5.455 4.64 12 9.548l6.545-4.91 1.528-1.145C21.69 2.28 24 3.434 24 5.457z"/></svg>
               Scan Inbox
             </button>
-            <div className="px-4 py-2 bg-[#16130e]/85 rounded-full border border-yellow-500/15 text-xs sm:text-sm font-bold shadow-sm flex items-center gap-2 text-[#b8b3a0]">
-              <BrainCircuit size={16} className="text-yellow-500 animate-pulse" />
-              Prod Score: {user.productivityScore}
-            </div>
           </div>
         </header>
 
@@ -584,7 +695,23 @@ export default function Dashboard() {
             {/* Quests Container */}
             <div className="space-y-4 max-w-4xl flex-1">
               <AnimatePresence>
-                {quests.filter(Boolean).map(quest => (
+                {quests
+                  .filter(q => {
+                    if (!q) return false;
+                    if (q.sm2Data) {
+                      return new Date(q.sm2Data.nextReviewDate) <= new Date();
+                    }
+                    return q.health > 0;
+                  })
+                  .sort((a, b) => {
+                    const aIsDueHabit = a.sm2Data && new Date(a.sm2Data.nextReviewDate) <= new Date() ? 1 : 0;
+                    const bIsDueHabit = b.sm2Data && new Date(b.sm2Data.nextReviewDate) <= new Date() ? 1 : 0;
+                    if (aIsDueHabit !== bIsDueHabit) return bIsDueHabit - aIsDueHabit;
+                    if (a.type === 'boss' && b.type !== 'boss') return -1;
+                    if (b.type === 'boss' && a.type !== 'boss') return 1;
+                    return 0;
+                  })
+                  .map(quest => (
                   <motion.div 
                     key={quest.id}
                     layout
@@ -593,22 +720,36 @@ export default function Dashboard() {
                     className={`glass-card p-6 border-l-4 ${quest.type === 'boss' ? 'border-l-red-500' : 'border-l-yellow-500'} bg-[#16130e]/95 border border-yellow-500/15 rounded-3xl shadow-xl`}
                   >
                     <div className="flex flex-col sm:flex-row justify-between items-start gap-4 mb-5">
-                      <div>
-                        <div className="flex flex-wrap items-center gap-2 mb-1">
-                          <h3 className="text-lg font-extrabold font-display text-[#fdfcf9]">{quest.title}</h3>
-                          {quest.type === 'boss' ? (
-                            <span className="px-2.5 py-0.5 rounded-full bg-red-500/20 text-red-400 text-[10px] font-black uppercase tracking-wide border border-red-500/30">
-                              Boss Battle
-                            </span>
-                          ) : (
-                            <span className="px-2.5 py-0.5 rounded-full bg-yellow-500/20 text-yellow-400 text-[10px] font-black uppercase tracking-wide border border-yellow-500/30">
-                              Main Quest
-                            </span>
-                          )}
+                      <div className="flex-1">
+                        <div className="flex justify-between items-start">
+                          <div className="flex flex-wrap items-center gap-2 mb-1">
+                            <h3 className={`text-lg font-extrabold font-display ${quest.health <= 0 ? 'text-[#fdfcf9]/40 line-through' : 'text-[#fdfcf9]'}`}>{quest.title}</h3>
+                            {quest.health <= 0 && (
+                              <span className="px-2.5 py-0.5 rounded-full bg-green-500/20 text-green-400 text-[10px] font-black uppercase tracking-wide border border-green-500/30">
+                                Completed
+                              </span>
+                            )}
+                            {quest.type === 'boss' && quest.health > 0 ? (
+                              <span className="px-2.5 py-0.5 rounded-full bg-red-500/20 text-red-400 text-[10px] font-black uppercase tracking-wide border border-red-500/30">
+                                Boss Battle
+                              </span>
+                            ) : (
+                              <span className="px-2.5 py-0.5 rounded-full bg-yellow-500/20 text-yellow-400 text-[10px] font-black uppercase tracking-wide border border-yellow-500/30">
+                                Main Quest
+                              </span>
+                            )}
+                          </div>
+                          <button 
+                            onClick={() => handleDeleteQuest(quest.id)}
+                            className="p-2 text-[#b8b3a0]/40 hover:text-red-500 hover:bg-red-500/10 rounded-lg transition-colors shrink-0"
+                            title="Delete Quest"
+                          >
+                            <Trash2 size={16} />
+                          </button>
                         </div>
                         <div className="text-xs text-[#b8b3a0]/70 font-bold flex items-center gap-1.5">
                           <AlertTriangle size={12} className={quest.riskScore === 'high' ? 'text-red-500' : 'text-yellow-500'} />
-                          Deadline: {new Date(quest.deadline).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
+                          Deadline: {new Date(quest.deadline).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute:'2-digit' })}
                         </div>
                       </div>
                       
@@ -626,12 +767,25 @@ export default function Dashboard() {
                     </div>
 
                     <div className="space-y-2">
-                      {quest.tasks.map(task => (
+                      {quest.tasks?.map(task => (
                         <div 
                           key={task.id}
                           onClick={() => handleTaskToggle(quest.id, task.id, task.completed)}
-                          className={`flex items-center gap-3 p-3 rounded-xl cursor-pointer transition-colors ${task.completed ? 'bg-yellow-500/5' : 'hover:bg-white/5 border border-transparent hover:border-yellow-500/10'}`}
+                          className={`flex items-center gap-3 p-3 rounded-xl cursor-pointer transition-colors relative ${task.completed ? 'bg-yellow-500/5' : 'hover:bg-white/5 border border-transparent hover:border-yellow-500/10'}`}
                         >
+                          <AnimatePresence>
+                            {floatingXp?.id === task.id && (
+                              <motion.div
+                                initial={{ opacity: 0, y: 0, scale: 0.8 }}
+                                animate={{ opacity: 1, y: -25, scale: 1.1 }}
+                                exit={{ opacity: 0, y: -40, scale: 0.9 }}
+                                transition={{ duration: 0.6, ease: "easeOut" }}
+                                className="absolute right-4 top-0 text-yellow-400 font-black font-display pointer-events-none drop-shadow-[0_0_8px_rgba(234,179,8,0.5)] z-20"
+                              >
+                                +{floatingXp.amount} XP
+                              </motion.div>
+                            )}
+                          </AnimatePresence>
                           {task.completed ? (
                             <CheckCircle2 className="text-yellow-400 shrink-0" size={18} />
                           ) : (
@@ -643,6 +797,47 @@ export default function Dashboard() {
                         </div>
                       ))}
                     </div>
+
+                    {quest.health <= 0 && quest.sm2Data && new Date(quest.sm2Data.nextReviewDate) <= new Date() && (
+                      <motion.div 
+                        initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}
+                        className="mt-4 p-4 bg-yellow-500/10 border border-yellow-500/20 rounded-xl"
+                      >
+                        <h4 className="text-xs font-bold text-yellow-500 mb-2 uppercase tracking-wide">Rate Difficulty to Reschedule</h4>
+                        <div className="flex gap-2">
+                          {[
+                            { label: 'Again', q: 1, color: 'bg-red-500/20 text-red-500 hover:bg-red-500/30' },
+                            { label: 'Hard', q: 3, color: 'bg-orange-500/20 text-orange-500 hover:bg-orange-500/30' },
+                            { label: 'Good', q: 4, color: 'bg-yellow-500/20 text-yellow-500 hover:bg-yellow-500/30' },
+                            { label: 'Easy', q: 5, color: 'bg-green-500/20 text-green-500 hover:bg-green-500/30' },
+                          ].map(btn => {
+                            const nextInterval = calculateSM2(btn.q, quest.sm2Data).interval;
+                            const intervalLabel = nextInterval === 1 ? '1 day' : `${nextInterval} days`;
+                            return (
+                              <button
+                                key={btn.label}
+                                onClick={async () => {
+                                  const res = await fetch(`/api/quests/${quest.id}/rate`, {
+                                    method: 'POST',
+                                    headers: { 'Content-Type': 'application/json' },
+                                    body: JSON.stringify({ quality: btn.q })
+                                  });
+                                  const data = await res.json();
+                                  if (data.success) {
+                                    setQuests(prev => prev.map(q => q && q.id === quest.id ? data.quest : q).filter(Boolean));
+                                    setChatHistory(prev => [...prev, { role: 'gm', text: `✨ Habit "${quest.title}" rescheduled for ${intervalLabel}.`}]);
+                                  }
+                                }}
+                                className={`flex-1 py-2 px-1 text-xs font-bold rounded-lg transition-colors flex flex-col items-center justify-center gap-1 ${btn.color}`}
+                              >
+                                <span>{btn.label}</span>
+                                <span className="text-[10px] opacity-70">{intervalLabel}</span>
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </motion.div>
+                    )}
                   </motion.div>
                 ))}
               </AnimatePresence>
@@ -650,13 +845,13 @@ export default function Dashboard() {
           </>
         ) : (
           <div className="flex-1 w-full relative">
-            <D3ForceGraph quests={quests} />
+            <D3ForceGraph quests={quests.filter(q => q && q.health > 0)} />
           </div>
         )}
       </main>
 
       {/* AI Game Master Panel */}
-      <aside className="w-full md:w-96 border-l border-yellow-500/10 bg-[#100e0a]/95 flex flex-col h-full shrink-0 relative z-10 tour-game-master">
+      <aside className="w-full md:w-96 border-l border-yellow-500/10 bg-[#100e0a]/95 flex flex-col h-80 shrink-0 relative z-10 tour-game-master md:sticky md:top-0 md:h-screen">
         <div className="p-4 border-b border-yellow-500/10 bg-[#16130e]/80 flex items-center gap-3">
           <div className="relative">
             <div className="w-10 h-10 rounded-xl bg-yellow-500/10 flex items-center justify-center border border-yellow-500/20">
@@ -670,7 +865,7 @@ export default function Dashboard() {
           </div>
         </div>
 
-        <div className="flex-1 overflow-y-auto p-4 space-y-4">
+        <div className="flex-1 overflow-y-auto scrollbar-hide p-4 space-y-4">
           {chatHistory.map((msg, i) => (
             <motion.div 
               initial={{ opacity: 0, y: 5 }}
@@ -717,6 +912,18 @@ export default function Dashboard() {
         </div>
       </aside>
 
+      {isFriendsModalOpen && user && (
+        <FriendsModal 
+          user={user} 
+          onClose={() => setIsFriendsModalOpen(false)} 
+          refreshUser={() => {
+            fetch('/api/user').then(res => res.json()).then(setUser);
+            fetch('/api/leaderboard').then(res => res.json()).then(data => {
+              if (data && Array.isArray(data.party)) setParty(data.party);
+            });
+          }} 
+        />
+      )}
     </div>
   );
 }
