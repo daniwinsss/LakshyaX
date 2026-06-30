@@ -329,7 +329,7 @@ export default function Dashboard() {
 
   if (!user) {
     return (
-      <div className="min-h-screen bg-[#0c0a07] text-yellow-500 flex flex-col items-center justify-center gap-4 font-mono font-bold">
+      <div className="fixed inset-0 w-full h-[100dvh] bg-[#0c0a07] text-yellow-500 flex flex-col items-center justify-center gap-4 font-mono font-bold">
         <Sword className="animate-bounce" size={32} />
         <span className="tracking-widest">LOADING REALM CONTROLS...</span>
       </div>
@@ -339,7 +339,7 @@ export default function Dashboard() {
   const xpPercentage = (user.xp / user.xpToNextLevel) * 100;
 
   return (
-    <div className="min-h-screen bg-[#0c0a07] text-[#fdfcf9] flex flex-col md:flex-row font-sans relative">
+    <div className="w-full h-[100dvh] bg-[#0c0a07] text-[#fdfcf9] flex flex-col md:flex-row font-sans relative overflow-hidden">
       <Joyride
         steps={tourSteps}
         run={runTour}
@@ -403,17 +403,17 @@ export default function Dashboard() {
       </AnimatePresence>
 
       {/* Decorative Grid with Premium Yellow/Gold Tint */}
-      <div className="absolute inset-0 bg-[linear-gradient(to_right,#eab30807_1px,transparent_1px),linear-gradient(to_bottom,#eab30807_1px,transparent_1px)] bg-[size:36px_36px] pointer-events-none z-0"></div>
+      <div className="fixed inset-0 bg-[linear-gradient(to_right,#eab30807_1px,transparent_1px),linear-gradient(to_bottom,#eab30807_1px,transparent_1px)] bg-[size:36px_36px] pointer-events-none z-0"></div>
       
       {/* Atmospheric radial spotlight mask */}
-      <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,transparent_30%,#0c0a07_95%)] pointer-events-none z-0"></div>
+      <div className="fixed inset-0 bg-[radial-gradient(circle_at_center,transparent_30%,#0c0a07_95%)] pointer-events-none z-0"></div>
 
       {/* Premium Floating Glowing Light-Orbs (Atmosphere) */}
-      <div className="absolute top-[-10%] left-[30%] w-[500px] h-[500px] rounded-full bg-gradient-to-tr from-yellow-600/10 via-amber-500/5 to-transparent blur-[120px] pointer-events-none z-0"></div>
-      <div className="absolute bottom-[-10%] right-[30%] w-[500px] h-[500px] rounded-full bg-gradient-to-bl from-amber-500/5 via-yellow-600/5 to-transparent blur-[120px] pointer-events-none z-0"></div>
+      <div className="fixed top-[-10%] left-[30%] w-[500px] h-[500px] rounded-full bg-gradient-to-tr from-yellow-600/10 via-amber-500/5 to-transparent blur-[120px] pointer-events-none z-0"></div>
+      <div className="fixed bottom-[-10%] right-[30%] w-[500px] h-[500px] rounded-full bg-gradient-to-bl from-amber-500/5 via-yellow-600/5 to-transparent blur-[120px] pointer-events-none z-0"></div>
 
       {/* Sidebar - Player Stats */}
-      <aside className="w-full md:w-80 border-r border-yellow-500/10 bg-[#16130e]/95 p-6 flex flex-col gap-6 shrink-0 overflow-y-auto scrollbar-hide hidden md:flex relative z-10 md:sticky md:top-0 md:h-screen">
+      <aside className="w-full md:w-80 border-r border-yellow-500/10 bg-[#16130e]/95 p-6 flex flex-col gap-6 shrink-0 overflow-y-auto scrollbar-hide hidden md:flex relative z-10 h-full">
         <div className="flex items-center justify-between">
           <button 
             onClick={() => {
@@ -566,7 +566,7 @@ export default function Dashboard() {
       </aside>
 
       {/* Main Content - Quests & Bosses */}
-      <main className="flex-1 min-w-0 p-6 md:p-10 bg-transparent flex flex-col gap-6 relative z-10">
+      <main className="flex-1 min-w-0 min-h-0 p-6 md:p-10 pb-24 bg-transparent flex flex-col gap-6 relative z-10 overflow-y-auto scrollbar-hide">
         <header className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-6">
           <div className="shrink-0">
             <div className="flex items-center gap-4 mb-2">
@@ -693,7 +693,7 @@ export default function Dashboard() {
             </div>
 
             {/* Quests Container */}
-            <div className="space-y-4 max-w-4xl flex-1">
+            <div className="space-y-4 max-w-4xl">
               <AnimatePresence>
                 {quests
                   .filter(q => {
@@ -845,13 +845,19 @@ export default function Dashboard() {
           </>
         ) : (
           <div className="flex-1 w-full relative">
-            <D3ForceGraph quests={quests.filter(q => q && q.health > 0)} />
+            <D3ForceGraph quests={quests.filter(q => {
+              if (!q) return false;
+              if (q.sm2Data) {
+                return new Date(q.sm2Data.nextReviewDate) <= new Date();
+              }
+              return q.health > 0;
+            })} />
           </div>
         )}
       </main>
 
       {/* AI Game Master Panel */}
-      <aside className="w-full md:w-96 border-l border-yellow-500/10 bg-[#100e0a]/95 flex flex-col h-80 shrink-0 relative z-10 tour-game-master md:sticky md:top-0 md:h-screen">
+      <aside className="w-full md:w-96 border-l border-yellow-500/10 bg-[#100e0a]/95 flex flex-col shrink-0 relative z-10 tour-game-master h-80 md:h-full">
         <div className="p-4 border-b border-yellow-500/10 bg-[#16130e]/80 flex items-center gap-3">
           <div className="relative">
             <div className="w-10 h-10 rounded-xl bg-yellow-500/10 flex items-center justify-center border border-yellow-500/20">

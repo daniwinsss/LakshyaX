@@ -100,7 +100,7 @@ export default function FocusDungeon() {
   };
 
   return (
-    <div className="min-h-screen bg-[#0a0908] text-[#fdfcf9] font-sans flex flex-col items-center justify-center relative overflow-hidden">
+    <div className="w-full min-h-[100dvh] bg-[#0a0908] text-[#fdfcf9] font-sans flex flex-col items-center justify-center relative overflow-hidden">
       {/* Background ambient fx */}
       <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-red-900/20 via-[#0a0908]/80 to-[#0a0908] pointer-events-none" />
 

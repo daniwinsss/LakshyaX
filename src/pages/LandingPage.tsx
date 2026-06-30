@@ -311,10 +311,10 @@ export default function LandingPage() {
     }
 
     return (
-      <div className="min-h-screen bg-[#0a0907] text-[#fdfcf9] flex flex-col items-center justify-center gap-6 font-mono relative overflow-hidden">
+      <div className="w-full min-h-[100dvh] bg-[#0a0907] text-[#fdfcf9] flex flex-col items-center justify-center gap-6 font-mono relative overflow-hidden scrollbar-hide">
         {/* Decorative Grid with Golden Tint */}
-        <div className="absolute inset-0 bg-[linear-gradient(to_right,#eab30807_1px,transparent_1px),linear-gradient(to_bottom,#eab30807_1px,transparent_1px)] bg-[size:40px_40px] pointer-events-none z-0"></div>
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,transparent_30%,#0a0907_95%)] pointer-events-none z-0"></div>
+        <div className="fixed inset-0 bg-[linear-gradient(to_right,#eab30807_1px,transparent_1px),linear-gradient(to_bottom,#eab30807_1px,transparent_1px)] bg-[size:40px_40px] pointer-events-none z-0"></div>
+        <div className="fixed inset-0 bg-[radial-gradient(circle_at_center,transparent_30%,#0a0907_95%)] pointer-events-none z-0"></div>
 
         {/* Glowing Ambient Spotlight */}
         <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[350px] h-[350px] rounded-full bg-yellow-500/10 blur-[100px] pointer-events-none z-0"></div>
@@ -372,12 +372,12 @@ export default function LandingPage() {
   }
 
   return (
-    <div className="min-h-screen bg-[#0e0d0a] text-[#fdfcf9] overflow-x-hidden relative font-sans">
+    <div className="w-full min-h-[100dvh] bg-[#0e0d0a] text-[#fdfcf9] overflow-x-hidden relative font-sans scrollbar-hide">
       {/* Decorative Grid with Premium Yellow/Gold Tint */}
-      <div className="absolute inset-0 bg-[linear-gradient(to_right,#eab30807_1px,transparent_1px),linear-gradient(to_bottom,#eab30807_1px,transparent_1px)] bg-[size:36px_36px] pointer-events-none z-0"></div>
+      <div className="fixed inset-0 bg-[linear-gradient(to_right,#eab30807_1px,transparent_1px),linear-gradient(to_bottom,#eab30807_1px,transparent_1px)] bg-[size:36px_36px] pointer-events-none z-0"></div>
 
       {/* Atmospheric radial spotlight mask */}
-      <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,transparent_30%,#0e0d0a_95%)] pointer-events-none z-0"></div>
+      <div className="fixed inset-0 bg-[radial-gradient(circle_at_center,transparent_30%,#0e0d0a_95%)] pointer-events-none z-0"></div>
 
       {/* Premium Floating Glowing Light-Orbs (Atmosphere) */}
       <div className="absolute top-[-5%] left-[50%] -translate-x-1/2 w-[700px] h-[700px] rounded-full bg-gradient-to-tr from-yellow-600/15 via-amber-500/10 to-yellow-500/5 blur-[140px] pointer-events-none z-0"></div>

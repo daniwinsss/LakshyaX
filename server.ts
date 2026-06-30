@@ -18,6 +18,43 @@ import { UserData, Quest } from "./src/types";
 
 dotenv.config();
 
+async function generateContentWithFallback(ai: GoogleGenAI, prompt: string): Promise<any> {
+  const models = ["gemini-2.5-flash", "gemini-2.0-flash", "gemini-1.5-flash", "gemini-2.5-pro"];
+  for (let i = 0; i < models.length; i++) {
+    try {
+      return await ai.models.generateContent({
+        model: models[i],
+        contents: prompt,
+      });
+    } catch (e: any) {
+      if ((e.status === 429 || e.message?.includes("429") || e.message?.includes("RESOURCE_EXHAUSTED") || e.message?.includes("quota") || e.status === 404 || e.message?.includes("NOT_FOUND") || e.message?.includes("is not found")) && i < models.length - 1) {
+        console.warn(`Model ${models[i]} quota exceeded or not found. Falling back to ${models[i+1]}...`);
+        continue;
+      }
+      throw e;
+    }
+  }
+}
+
+async function embedContentWithFallback(ai: GoogleGenAI, text: string): Promise<any> {
+  const models = ["text-embedding-004", "gemini-embedding-2"]; // Try multiple known embedding models
+  for (let i = 0; i < models.length; i++) {
+    try {
+      return await ai.models.embedContent({
+        model: models[i],
+        contents: text,
+        config: { outputDimensionality: 768 }
+      });
+    } catch (e: any) {
+      if ((e.status === 429 || e.message?.includes("429") || e.message?.includes("RESOURCE_EXHAUSTED") || e.message?.includes("quota") || e.status === 404 || e.message?.includes("NOT_FOUND") || e.message?.includes("is not found")) && i < models.length - 1) {
+        console.warn(`Model ${models[i]} quota exceeded or not found. Falling back to ${models[i+1]}...`);
+        continue;
+      }
+      throw e;
+    }
+  }
+}
+
 async function startServer() {
   const app = express();
   const PORT = 3000;
@@ -256,16 +293,12 @@ async function startServer() {
       if (ai && process.env.GEMINI_API_KEY) {
         try {
           const textToEmbed = `Quest Title: ${quest.title}. Tasks: ${quest.tasks?.map((t: any) => t.title).join(", ")}`;
-          const embedRes = await ai.models.embedContent({
-            model: "gemini-embedding-2",
-            contents: textToEmbed,
-            config: { outputDimensionality: 768 }
-          });
+          const embedRes = await embedContentWithFallback(ai, textToEmbed);
           embedding = embedRes.embeddings[0].values;
           quest.embedding = embedding;
         } catch (e: any) {
-          if (e.status === 503 || e.message?.includes("503")) {
-            console.log("Gemini API is busy (503), skipping embedding generation for quest.");
+          if (e.status === 503 || e.message?.includes("503") || e.status === 429 || e.message?.includes("429") || e.message?.includes("RESOURCE_EXHAUSTED")) {
+            console.log("Gemini API is unavailable or rate limited, skipping embedding generation for quest.");
           } else {
             console.error("Failed to generate embedding for quest", e.message || e);
           }
@@ -339,10 +372,7 @@ async function startServer() {
         "tasks": ["Phase 1: [Actionable Step]", "Phase 2: [Actionable Step]", ...],
         "dependencies": ["<quest_id_1>", ...]
       }`;
-      const response = await ai.models.generateContent({
-        model: "gemini-2.5-flash",
-        contents: prompt,
-      });
+      const response = await generateContentWithFallback(ai, prompt);
 
       let text = response.text
         .replace(/```json/g, "")
@@ -360,8 +390,8 @@ async function startServer() {
         })),
       });
     } catch (e: any) {
-      if (e.status === 503 || e.message?.includes("503")) {
-        console.log("Gemini API is busy (503), using fallback quest generation.");
+      if (e.status === 503 || e.message?.includes("503") || e.status === 429 || e.message?.includes("429") || e.message?.includes("RESOURCE_EXHAUSTED")) {
+        console.log("Gemini API is unavailable or rate limited, using fallback quest generation.");
       } else {
         console.error("Gemini API error during quest generation:", e.message || e);
       }
@@ -581,11 +611,7 @@ async function startServer() {
 
       let contextStr = "";
       try {
-        const embedRes = await ai.models.embedContent({
-          model: "gemini-embedding-2",
-          contents: message,
-          config: { outputDimensionality: 768 }
-        });
+        const embedRes = await embedContentWithFallback(ai, message);
         const msgEmbedding = embedRes.embeddings[0].values;
         const similarQuests = await findSimilarQuests(msgEmbedding, 3);
         if (similarQuests && similarQuests.length > 0) {
@@ -600,10 +626,7 @@ async function startServer() {
       Keep it short, immersive, and motivating. Maximum 2 sentences.
       User says: "${message}"${contextStr}`;
 
-      const response = await ai.models.generateContent({
-        model: "gemini-2.5-flash",
-        contents: prompt,
-      });
+      const response = await generateContentWithFallback(ai, prompt);
       res.json({ response: response.text });
     } catch (e: any) {
       console.error(e);
