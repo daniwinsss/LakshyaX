@@ -68,9 +68,9 @@ async function startServer() {
 
   // Initialize Gemini
   let ai: GoogleGenAI | null = null;
-  if (process.env.GEMINI_API_KEY) {
+  if (process.env.GEMINII_API_KEY) {
     try {
-      ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+      ai = new GoogleGenAI({ apiKey: process.env.GEMINII_API_KEY });
     } catch (e) {
       console.error("Failed to initialize GoogleGenAI:", e);
     }
@@ -290,7 +290,7 @@ async function startServer() {
         quest.id = String(db.quests.length + 1) + "_" + Date.now();
       }
       let embedding: number[] | undefined = undefined;
-      if (ai && process.env.GEMINI_API_KEY) {
+      if (ai && process.env.GEMINII_API_KEY) {
         try {
           const textToEmbed = `Quest Title: ${quest.title}. Tasks: ${quest.tasks?.map((t: any) => t.title).join(", ")}`;
           const embedRes = await embedContentWithFallback(ai, textToEmbed);
@@ -329,7 +329,7 @@ async function startServer() {
   app.post("/api/generate-quest", async (req, res) => {
     const { title, deadline } = req.body;
     try {
-      if (!ai || !process.env.GEMINI_API_KEY) {
+      if (!ai || !process.env.GEMINII_API_KEY) {
         // Fallback if no API key
         return res.json({
           difficulty: "medium",
@@ -602,7 +602,7 @@ async function startServer() {
   app.post("/api/chat", async (req, res) => {
     const { message } = req.body;
     try {
-      if (!ai || !process.env.GEMINI_API_KEY) {
+      if (!ai || !process.env.GEMINII_API_KEY) {
         return res.json({
           response:
             "I am the Game Master. You must configure the Gemini API key to hear my true voice.",
