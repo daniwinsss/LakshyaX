@@ -45,6 +45,22 @@ npm run dev
 
 The application will be available at `http://localhost:3000`.
 
+### Docker Support
+
+You can also run the application using Docker:
+
+1. **Build the Docker image:**
+   ```bash
+   docker build -t lakshyax .
+   ```
+
+2. **Run the container:**
+   ```bash
+   docker run -p 3000:3000 -e GEMINII_API_KEY="your_api_key" lakshyax
+   ```
+
+The application will be accessible at `http://localhost:3000`.
+
 ## ⚙️ How the AI Works
 
 * **Quest Breakdown:** Uses `gemini-2.5-flash` (with fallbacks to `gemini-2.0-flash`, `gemini-1.5-flash`, etc.) to parse your goal and generate a structured JSON roadmap.
